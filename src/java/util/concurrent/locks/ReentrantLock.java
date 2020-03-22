@@ -126,16 +126,20 @@ public class ReentrantLock implements Lock, java.io.Serializable {
          * Performs non-fair tryLock.  tryAcquire is implemented in
          * subclasses, but both need nonfair try for trylock method.
          */
+        // 1. 获取当前线程，判断当前的锁的状态
+        // 2. 如果 state=0 表示当前是无锁状态，通过 cas 更新 state 状态的值
+        // 3. 当前线程是属于重入，则增加重入次数
         final boolean nonfairTryAcquire(int acquires) {
-            final Thread current = Thread.currentThread();
-            int c = getState();
-            if (c == 0) {
+            final Thread current = Thread.currentThread();//获取当前执行的线程
+            int c = getState();//获得 state 的值
+            if (c == 0) {//表示无锁状态
+                //这里为什么还要来一段？万一在之前cas判断，到执行到这里这中间之前的被释放了？这里再尝试一下
                 if (compareAndSetState(0, acquires)) {
-                    setExclusiveOwnerThread(current);
-                    return true;
+                    setExclusiveOwnerThread(current);//cas 替换 state 的值， cas 成功表示获取锁成功
+                    return true;//保存当前获得锁的线程,下次再来的时候不要再尝试竞争锁
                 }
             }
-            else if (current == getExclusiveOwnerThread()) {
+            else if (current == getExclusiveOwnerThread()) {//如果同一个线程来获得锁，直接增加重入次数
                 int nextc = c + acquires;
                 if (nextc < 0) // overflow
                     throw new Error("Maximum lock count exceeded");
@@ -145,13 +149,22 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             return false;
         }
 
+        //这个方法可以认为是一个设置锁状态的操作， 通过将 state 状态减掉传入的参数值（参数是 1），
+        // 如果结果状态为 0，就将排它锁的 Owner 设置为 null，以使得其它的线程有机会进行执行。
+
+        // 在排它锁中，加锁的时候状态会增加 1（当然可以自己修改这个值），在解锁的时候减掉 1，同一个锁，在可以重入后，
+        // 可能会被叠加为 2、 3、 4 这些值，只有 unlock()的次数与 lock()的次数对应才会将 Owner 线程设置为空，
+        // 而且也只有这种情况下才会返回 true
         protected final boolean tryRelease(int releases) {
+            //state-1
             int c = getState() - releases;
             if (Thread.currentThread() != getExclusiveOwnerThread())
                 throw new IllegalMonitorStateException();
             boolean free = false;
             if (c == 0) {
+                //c=0的时候，释放完了。返回true
                 free = true;
+                //如果结果状态为 0，就将排它锁的 Owner 设置为 null
                 setExclusiveOwnerThread(null);
             }
             setState(c);
@@ -202,6 +215,9 @@ public class ReentrantLock implements Lock, java.io.Serializable {
          * Performs lock.  Try immediate barge, backing up to normal
          * acquire on failure.
          */
+        // 1. 非公平锁和公平锁最大的区别在于，在非公平锁中我抢占锁的逻辑是，不管有没有线程排队，我先上来 cas 去抢占一下
+        // 2. CAS 成功，就表示成功获得了锁
+        // 3. CAS 失败，调用 acquire(1)走锁竞争逻辑
         final void lock() {
             if (compareAndSetState(0, 1))
                 setExclusiveOwnerThread(Thread.currentThread());
@@ -232,6 +248,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             final Thread current = Thread.currentThread();
             int c = getState();
             if (c == 0) {
+                //没有前驱节点的时候获得锁
                 if (!hasQueuedPredecessors() &&
                     compareAndSetState(0, acquires)) {
                     setExclusiveOwnerThread(current);
