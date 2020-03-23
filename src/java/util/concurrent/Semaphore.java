@@ -242,6 +242,7 @@ public class Semaphore implements java.io.Serializable {
 
         protected int tryAcquireShared(int acquires) {
             for (;;) {
+                // 区别就在于是不是会先判断是否有线程在排队，然后才进行 CAS 减操作
                 if (hasQueuedPredecessors())
                     return -1;
                 int available = getState();
