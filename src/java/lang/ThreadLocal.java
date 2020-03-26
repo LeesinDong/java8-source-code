@@ -57,6 +57,7 @@ public class ThreadLocal<T> {
      * are used by the same threads, while remaining well-behaved in
      * less common cases.
      */
+    //看nextHashCode
     private final int threadLocalHashCode = nextHashCode();
 
     /**
@@ -77,6 +78,10 @@ public class ThreadLocal<T> {
      * Returns the next hash code.
      */
     private static int nextHashCode() {
+        //原子操作得到HASH_INCREMENT 这个魔数
+        //通过这个值会完美的散列在ENTRY的数组里面
+        //斐波那契完整的是i * HASH_INCREMENT + HASH_INCREMENT;
+        //这里通过getAndAdd，每次进来都会增加，所以跟上面其实是一样的。
         return nextHashCode.getAndAdd(HASH_INCREMENT);
     }
 
@@ -99,6 +104,7 @@ public class ThreadLocal<T> {
      * @return the initial value for this thread-local
      */
     protected T initialValue() {
+        //返回null
         return null;
     }
 
@@ -133,8 +139,11 @@ public class ThreadLocal<T> {
      */
     public T get() {
         Thread t = Thread.currentThread();
+        //进入getMap
         ThreadLocalMap map = getMap(t);
+        //一个线程顶一个两个ThreadLocal走这里
         if (map != null) {
+            // 进入getEntry()
             ThreadLocalMap.Entry e = map.getEntry(this);
             if (e != null) {
                 @SuppressWarnings("unchecked")
@@ -142,6 +151,7 @@ public class ThreadLocal<T> {
                 return result;
             }
         }
+        //第一次先走这里 看着里，在demo中被重写的
         return setInitialValue();
     }
 
@@ -152,12 +162,14 @@ public class ThreadLocal<T> {
      * @return the initial value
      */
     private T setInitialValue() {
+        //进入看一下
         T value = initialValue();
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
         if (map != null)
             map.set(this, value);
         else
+            //先走这里
             createMap(t, value);
         return value;
     }
@@ -205,6 +217,7 @@ public class ThreadLocal<T> {
      * @return the map
      */
     ThreadLocalMap getMap(Thread t) {
+        //返回当前线程的threadLocals
         return t.threadLocals;
     }
 
@@ -216,6 +229,7 @@ public class ThreadLocal<T> {
      * @param firstValue value for the initial entry of the map
      */
     void createMap(Thread t, T firstValue) {
+        //<this,value>的map 进入构造方法看看
         t.threadLocals = new ThreadLocalMap(this, firstValue);
     }
 
@@ -280,11 +294,13 @@ public class ThreadLocal<T> {
          * entry can be expunged from table.  Such entries are referred to
          * as "stale entries" in the code that follows.
          */
+        //构建Entry
         static class Entry extends WeakReference<ThreadLocal<?>> {
             /** The value associated with this ThreadLocal. */
             Object value;
-
+            //需要Key和value
             Entry(ThreadLocal<?> k, Object v) {
+                //super是谁
                 super(k);
                 value = v;
             }
@@ -340,8 +356,10 @@ public class ThreadLocal<T> {
         ThreadLocalMap(ThreadLocal<?> firstKey, Object firstValue) {
             table = new Entry[INITIAL_CAPACITY];
             int i = firstKey.threadLocalHashCode & (INITIAL_CAPACITY - 1);
+            //放到Entry数组7e中
             table[i] = new Entry(firstKey, firstValue);
             size = 1;
+            //
             setThreshold(INITIAL_CAPACITY);
         }
 
@@ -386,6 +404,8 @@ public class ThreadLocal<T> {
          * @return the entry associated with key, or null if no such
          */
         private Entry getEntry(ThreadLocal<?> key) {
+            //看threadLocalHashCode
+            //斐波那契额threadLocalHashCode
             int i = key.threadLocalHashCode & (table.length - 1);
             Entry e = table[i];
             if (e != null && e.get() == key)
@@ -436,25 +456,31 @@ public class ThreadLocal<T> {
             Entry[] tab = table;
             int len = tab.length;
             int i = key.threadLocalHashCode & (len-1);
-
+            //遍历Entry数组，拿到ThreadLocal属性，已经存在的情况
             for (Entry e = tab[i];
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
                 ThreadLocal<?> k = e.get();
 
+                //如果key相等 替换
                 if (k == key) {
                     e.value = value;
                     return;
                 }
 
+                //key=null  把当前下标直接移除掉。
+                //key什么时候为空？
+                //因为Entry的key是弱引用为null的时候会被回收掉，所以这里去掉这里的存储。
                 if (k == null) {
                     replaceStaleEntry(key, value, i);
                     return;
                 }
             }
 
+            //不存在的话，增加一个下标，增加一个size
             tab[i] = new Entry(key, value);
             int sz = ++size;
+            //超过阈值，扩容
             if (!cleanSomeSlots(i, sz) && sz >= threshold)
                 rehash();
         }

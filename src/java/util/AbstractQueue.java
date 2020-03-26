@@ -91,6 +91,8 @@ public abstract class AbstractQueue<E>
      * @throws IllegalArgumentException if some property of this element
      *         prevents it from being added to this queue
      */
+    //从父类的 add 方法可以看到，这里做了一个队列是否满了的判
+    // 断，如果队列满了直接抛出一个异常
     public boolean add(E e) {
         if (offer(e))
             return true;

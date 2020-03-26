@@ -34,15 +34,11 @@
  */
 
 package java.util.concurrent;
+
+import java.lang.ref.WeakReference;
+import java.util.*;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.AbstractQueue;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-import java.lang.ref.WeakReference;
-import java.util.Spliterators;
-import java.util.Spliterator;
 
 /**
  * A bounded {@linkplain BlockingQueue blocking queue} backed by an
@@ -158,30 +154,50 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
         // assert lock.getHoldCount() == 1;
         // assert items[putIndex] == null;
         final Object[] items = this.items;
-        items[putIndex] = x;
-        if (++putIndex == items.length)
+        items[putIndex] = x;//通过 putIndex 对数据赋
+        if (++putIndex == items.length)// 当 putIndex 等于数组长度时，将 putIndex 重置为 0
+            // 添加到最后一个就重置为0
+            // 1. 当元素满了以后是无法继续添加的，因为会报错
+            // 2. 其次，队列中的元素肯定会有一个消费者线程通过 take
+            //offer是不报错的。
             putIndex = 0;
-        count++;
-        notEmpty.signal();
+        count++;//记录队列元素的个数
+        notEmpty.signal();//唤醒处于等待状态下的线程，表示当前队列中的元素不为空,如果存在消费者线程阻塞，就可以开始取出元素
+
+        // 这里大家肯定会有一个疑问， putIndex 为什么会在等于数
+        // 组长度的时候重新设置为 0。
+        // 因为 ArrayBlockingQueue 是一个 FIFO 的队列，队列添加
+        // 元素时，是从队尾获取 putIndex 来存储元素，当 putIndex
+        // 等于数组长度时，下次就需要从数组头部开始添加了。下面这个图模拟了添加到不同长度的元素时， putIndex 的
+        // 变化，当 putIndex 等于数组长度时，不可能让 putIndex 继
+        // 续累加，否则会超出数组初始化的容量大小。同时大家还
+        // 需要思考两个问题
+        // 1. 当元素满了以后是无法继续添加的，因为会报错
+        // 2. 其次，队列中的元素肯定会有一个消费者线程通过 take
+        // 或者其他方法来获取数据，而获取数据的同时元素也会
+        // 从队列中移除
     }
 
     /**
      * Extracts element at current take position, advances, and signals.
      * Call only when holding lock.
      */
+    //这个是出队列的方法，主要是删除队列头部的元素并发返
+    // 回给客户端
     private E dequeue() {
         // assert lock.getHoldCount() == 1;
         // assert items[takeIndex] != null;
         final Object[] items = this.items;
         @SuppressWarnings("unchecked")
-        E x = (E) items[takeIndex];
-        items[takeIndex] = null;
-        if (++takeIndex == items.length)
+        E x = (E) items[takeIndex];//默认获取 0 位置 的元素
+        items[takeIndex] = null;//将该位置的元素设置为空
+        if (++takeIndex == items.length)//这里的作用 也是一样，如果拿到数组的最大值，那么重置为 0，继续从头部
+                // 位置开始获取数据
             takeIndex = 0;
-        count--;
+        count--;//记录 元素个数递减
         if (itrs != null)
-            itrs.elementDequeued();
-        notFull.signal();
+            itrs.elementDequeued();//同时更新迭代器中的元素数据  即Iterator
+        notFull.signal();//触发 因为队列满了以后导致的被阻塞的线程
         return x;
     }
 
@@ -235,6 +251,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
      * @param capacity the capacity of this queue
      * @throws IllegalArgumentException if {@code capacity < 1}
      */
+    //capacity： 表示数组的长度，也就是队列的长度
     public ArrayBlockingQueue(int capacity) {
         this(capacity, false);
     }
@@ -249,13 +266,15 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
      *        if {@code false} the access order is unspecified.
      * @throws IllegalArgumentException if {@code capacity < 1}
      */
+    //fair：表示是否为公平的阻塞队列，默认情况下构造的是非
+    // 公平的阻塞队列。
     public ArrayBlockingQueue(int capacity, boolean fair) {
         if (capacity <= 0)
             throw new IllegalArgumentException();
         this.items = new Object[capacity];
-        lock = new ReentrantLock(fair);
-        notEmpty = lock.newCondition();
-        notFull =  lock.newCondition();
+        lock = new ReentrantLock(fair);//重入锁，出队和入队持有这一把锁
+        notEmpty = lock.newCondition();//初始化非空等待队列
+        notFull =  lock.newCondition();//初始化非满等待队列
     }
 
     /**
@@ -321,8 +340,16 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
      *
      * @throws NullPointerException if the specified element is null
      */
+
+    //add 方法最终还是调用 offer 方法来添加数据，返回一个添加成功或者失败的布尔值反馈
+    // 这段代码做了几个事情
+    // 1. 判断添加的数据是否为空
+    // 2. 添加重入锁
+    // 3. 判断队列长度，如果队列长度等于数组长度，表示满了
+    // 直接返回 false
+    // 4. 否则，直接调用 enqueue 将元素添加到队列中
     public boolean offer(E e) {
-        checkNotNull(e);
+        checkNotNull(e);//对请求数据做判断
         final ReentrantLock lock = this.lock;
         lock.lock();
         try {
@@ -347,10 +374,15 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
     public void put(E e) throws InterruptedException {
         checkNotNull(e);
         final ReentrantLock lock = this.lock;
+        //可以被中断的锁
+        //这个也是获得锁，但
+        // 是和 lock 的区别是，这个方法优先允许在等待时由其他线程调
+        // 用等待线程的 interrupt 方法来中断等待直接返回。而 lock
+        // 方法是尝试获得锁成功后才响应中断
         lock.lockInterruptibly();
         try {
             while (count == items.length)
-                notFull.await();
+                notFull.await();//队列满了的情况下，当前线程将会被 notFull 条件对象挂起加到等待队列中
             enqueue(e);
         } finally {
             lock.unlock();
@@ -395,12 +427,18 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
         }
     }
 
+    //take 方法是一种阻塞获取队列中元素的方法
+    // 它的实现原理很简单，有就删除没有就阻塞，注意这个阻
+    // 塞是可以中断的，如果队列没有数据那么就加入 notEmpty
+    // 条件队列等待(有数据就直接取走，方法结束)，如果有新的
+    // put 线程添加了数据，那么 put 操作将会唤醒 take 线程，
+    // 执行 take 操作
     public E take() throws InterruptedException {
         final ReentrantLock lock = this.lock;
         lock.lockInterruptibly();
         try {
             while (count == 0)
-                notEmpty.await();
+                notEmpty.await();//如果队列为空的情况下，直接通过 await 方法阻塞
             return dequeue();
         } finally {
             lock.unlock();
@@ -492,21 +530,24 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
      */
     public boolean remove(Object o) {
         if (o == null) return false;
-        final Object[] items = this.items;
+        final Object[] items = this.items;//获取数组元素
         final ReentrantLock lock = this.lock;
-        lock.lock();
+        lock.lock();//获得锁
         try {
-            if (count > 0) {
+            if (count > 0) {//如果队列不为空
                 final int putIndex = this.putIndex;
-                int i = takeIndex;
+                //获取下一个要添加元素时的索引
+                int i = takeIndex;//获取当前要被移除的元素的索引
                 do {
-                    if (o.equals(items[i])) {
-                        removeAt(i);
-                        return true;
+                    if (o.equals(items[i])) {//从takeIndex 下标开始，找到要被删除的元素
+                        removeAt(i);//移除指定元素
+                        return true;//返回执行结果
                     }
+                    //当前删除索引执行加 1 后判断是否与数组长度相等
+                    //若为 true，说明索引已到数组尽头，将 i 设置为 0
                     if (++i == items.length)
                         i = 0;
-                } while (i != putIndex);
+                } while (i != putIndex);//继续查找，直到找到最后一个元素
             }
             return false;
         } finally {
