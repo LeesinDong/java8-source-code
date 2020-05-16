@@ -381,6 +381,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
     private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0)); //111
     private static final int COUNT_BITS = Integer.SIZE - 3;//32-3
     private static final int CAPACITY   = (1 << COUNT_BITS) - 1;//将 1 的二进制向右位移 29 位,再减 1 表示最大线程容量
+    //，这个常量表示workerCount的上限值，大约是5亿。
 
     // runState is stored in the high-order bits
     //运行状态保存在 int 值的高 3 位 (所有数值左移 29 位)
@@ -392,7 +393,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
 
     // Packing and unpacking ctl
     private static int runStateOf(int c)     { return c & ~CAPACITY; }//运行状态
-    private static int workerCountOf(int c)  { return c & CAPACITY; }//当前池中线程
+    private static int workerCountOf(int c)  { return c & CAPACITY; }//当前池中线程（worker）
     private static int ctlOf(int rs, int wc) { return rs | wc; }
 
     /*
@@ -543,6 +544,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * Maximum pool size. Note that the actual maximum is internally
      * bounded by CAPACITY.
      */
+    //最大池大小。注意，实际的最大值是由容量内部限制的。
     private volatile int maximumPoolSize;
 
     /**
@@ -911,12 +913,15 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             int rs = runStateOf(c);
 
             // Check if queue empty only if necessary.
-            //如果线程处于非运行状态，并且 rs 不等于 SHUTDOWN 且 firstTask 不等于空且且
-            // workQueue 为空，直接返回 false（表示不可添加 work 状态）
+            //如果线程处于非运行状态，并且 rs 不等于 SHUTDOWN 且 firstTask 不等于空且workQueue 不为空，（注意看这里的括号 第一个和后面三个与）
+            // 直接返回 false（表示不可添加 work 状态）
             // 1. 线程池已经 shutdown 后，还要添加新的任务，拒绝
             // 2. （第二个判断） SHUTDOWN 状态不接受新任务，但仍然会执行已经加入任务队列的任
             // 务，所以当进入 SHUTDOWN 状态，而传进来的任务为空，并且任务队列不为空的时候，是允许添加
             // 新线程的,如果把这个条件取反，就表示不允许添加 worker
+
+            // private static final int SHUTDOWN   =  0 << COUNT_BITS;// 不接收新任务,但是执行队列中的任务
+            // private static final int STOP       =  1 << COUNT_BITS;// 不接收新任务,不执行队列中的任务,中断正在执行中的任务
             if (rs >= SHUTDOWN &&
                 ! (rs == SHUTDOWN &&
                    firstTask == null &&
@@ -1058,7 +1063,8 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         if (runStateLessThan(c, STOP)) {
             //不是突然完成的，即没有task任务可以获取而完成的，计算min，并根据当前worker数量判断是否需要addWorker()
             if (!completedAbruptly) {
-                //allowCoreThreadTimeOut
+                //allowCoreThreadTimeOut core不允许通过超时时间去掉
+                //ture可以减到0，false最小就是coresize
                 int min = allowCoreThreadTimeOut ? 0 : corePoolSize;//allowCoreThreadTimeOut默认为false，即min默认为corePoolSize
                 //如果min为0，即不需要维持核心线程数量，且workQueue不为空，至少保持一个线程
                 if (min == 0 && ! workQueue.isEmpty())
@@ -1069,6 +1075,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             }
             //添加一个没有firstTask的worker
             //只要worker是completedAbruptly突然终止的，或者线程数量小于要维护的数量(队列中还有东西)，就新添一个worker线程，即使是shutdown状态
+            // 必须有一个或者coresize个
             addWorker(null, false);
         }
     }
@@ -1214,6 +1221,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
         // 而 interruptIfStarted()中只有 state>=0 才允许调用中断
         //现在给你机会中断啊，一会就不行了
         w.unlock(); // allow interrupts
+        // Abrupt生硬的
         boolean completedAbruptly = true;
         try {
             //注意这个 while 循环,在这里实现了 [线程复用] // 如果 task 为空，则通过

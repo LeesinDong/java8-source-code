@@ -295,7 +295,6 @@ public class FutureTask<V> implements RunnableFuture<V> {
                 }
                 if (ran)
                     set(result);//设置结果
-                    set(result);//设置结果
             }
         } finally {
             // runner must be non-null until state is settled to
@@ -380,7 +379,6 @@ public class FutureTask<V> implements RunnableFuture<V> {
         volatile WaitNode next;
         WaitNode() { thread = Thread.currentThread(); }
     }
-
     /**
      * Removes and signals all waiting threads, invokes done(), and
      * nulls out callable.
@@ -419,7 +417,7 @@ public class FutureTask<V> implements RunnableFuture<V> {
      * @return state upon completion
      */
     // 如果当前的结果还没有被执行完，把当前线程线程和插入到等待队
-    //理解为callable中结果没有执行完，可能sleep了，就把当前的这个FutureTask挂起，知道callable中结果执行完了，在set方法中unpark
+    //理解为callable中结果没有执行完，可能sleep了，就把当前的这个FutureTask挂起，直到callable中结果执行完了，在set方法中unpark
     //可以看下waitNode，就是把当前的线程放进去，还有next节点
     //看run方法里的set方法，点进去finishCompletion  进行了唤醒
 

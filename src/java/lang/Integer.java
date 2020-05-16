@@ -1095,9 +1095,11 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @see     System#getProperty(java.lang.String)
      * @see     System#getProperty(java.lang.String, java.lang.String)
      */
+    //给了一个默认值
     public static Integer getInteger(String nm, Integer val) {
         String v = null;
         try {
+            //这里面实质上还是走的System.getProperty(nm);
             v = System.getProperty(nm);
         } catch (IllegalArgumentException | NullPointerException e) {
         }
@@ -1105,6 +1107,7 @@ public final class Integer extends Number implements Comparable<Integer> {
             try {
                 return Integer.decode(v);
             } catch (NumberFormatException e) {
+            //    异常没有处理，防止报错
             }
         }
         return val;

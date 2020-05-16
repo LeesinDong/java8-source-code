@@ -36,23 +36,11 @@
 package java.util.concurrent;
 
 import java.lang.Thread.UncaughtExceptionHandler;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.AbstractExecutorService;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.RunnableFuture;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.security.AccessControlContext;
-import java.security.ProtectionDomain;
 import java.security.Permissions;
+import java.security.ProtectionDomain;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * An {@link ExecutorService} for running {@link ForkJoinTask}s.
@@ -2396,27 +2384,28 @@ public class ForkJoinPool extends AbstractExecutorService {
      *
      * @param task the task. Caller must ensure non-null.
      */
+    //添加给定任务到submission队列中
     final void externalPush(ForkJoinTask<?> task) {
         WorkQueue[] ws; WorkQueue q; int m;
-        int r = ThreadLocalRandom.getProbe();
+        int r = ThreadLocalRandom.getProbe();//探针值，用于计算WorkQueue槽位索引
         int rs = runState;
-        if ((ws = workQueues) != null && (m = (ws.length - 1)) >= 0 &&
-            (q = ws[m & r & SQMASK]) != null && r != 0 && rs > 0 &&
+        if ((ws = workQueues) != null && (m = (ws.length - 1)) >= 0 &&//获取随机偶数槽位的workQueue
+            (q = ws[m & r & SQMASK]) != null && r != 0 && rs > 0 &&//锁定workQueue
             U.compareAndSwapInt(q, QLOCK, 0, 1)) {
             ForkJoinTask<?>[] a; int am, n, s;
             if ((a = q.array) != null &&
                 (am = a.length - 1) > (n = (s = q.top) - q.base)) {
-                int j = ((am & s) << ASHIFT) + ABASE;
-                U.putOrderedObject(a, j, task);
-                U.putOrderedInt(q, QTOP, s + 1);
-                U.putIntVolatile(q, QLOCK, 0);
+                int j = ((am & s) << ASHIFT) + ABASE;//计算任务索引位置
+                U.putOrderedObject(a, j, task);//任务入列
+                U.putOrderedInt(q, QTOP, s + 1);//更新push slot
+                U.putIntVolatile(q, QLOCK, 0);//解除锁定
                 if (n <= 1)
-                    signalWork(ws, q);
+                    signalWork(ws, q);//任务数小于1时尝试创建或激活一个工作线程
                 return;
             }
-            U.compareAndSwapInt(q, QLOCK, 1, 0);
+            U.compareAndSwapInt(q, QLOCK, 1, 0);//解除锁定
         }
-        externalSubmit(task);
+        externalSubmit(task);//初始化workQueues及相关属性
     }
 
     /**
@@ -2559,10 +2548,11 @@ public class ForkJoinPool extends AbstractExecutorService {
      * any security checks or parameter validation.  Invoked directly by
      * makeCommonPool.
      */
-    private ForkJoinPool(int parallelism,
-                         ForkJoinWorkerThreadFactory factory,
-                         UncaughtExceptionHandler handler,
-                         int mode,
+    private ForkJoinPool(int parallelism,//并行度，默认为CPU数，最小为1
+                         ForkJoinWorkerThreadFactory factory,//工作线程工厂；
+                         UncaughtExceptionHandler handler,//处理工作线程运行任务时的异常情况类，默认为null；
+                         int mode,//是否为异步模式，默认为 false。如果为true，表示子任务的执行遵循 FIFO 顺序并且任务不能被合并（join），
+                         // 这种模式适用于工作线程只运行事件类型的异步任务。
                          String workerNamePrefix) {
         this.workerNamePrefix = workerNamePrefix;
         this.factory = factory;
@@ -3410,11 +3400,11 @@ public class ForkJoinPool extends AbstractExecutorService {
         UncaughtExceptionHandler handler = null;
         try {  // ignore exceptions in accessing/parsing properties
             String pp = System.getProperty
-                ("java.util.concurrent.ForkJoinPool.common.parallelism");
+                ("java.util.concurrent.ForkJoinPool.common.parallelism");//并行度
             String fp = System.getProperty
-                ("java.util.concurrent.ForkJoinPool.common.threadFactory");
+                ("java.util.concurrent.ForkJoinPool.common.threadFactory");//线程工厂
             String hp = System.getProperty
-                ("java.util.concurrent.ForkJoinPool.common.exceptionHandler");
+                ("java.util.concurrent.ForkJoinPool.common.exceptionHandler");//异常处理类
             if (pp != null)
                 parallelism = Integer.parseInt(pp);
             if (fp != null)
