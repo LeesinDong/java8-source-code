@@ -75,6 +75,7 @@ public enum ElementType {
     TYPE,
 
     /** Field declaration (includes enum constants) */
+     
     FIELD,
 
     /** Method declaration */

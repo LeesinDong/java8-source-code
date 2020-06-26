@@ -404,12 +404,16 @@ public abstract class ClassLoader {
         synchronized (getClassLoadingLock(name)) {
             // First, check if the class has already been loaded
             Class<?> c = findLoadedClass(name);
+            //没有缓存，即没有加载
             if (c == null) {
                 long t0 = System.nanoTime();
                 try {
                     if (parent != null) {
+                        //父类迭代
+                        //一层一层找父类
                         c = parent.loadClass(name, false);
                     } else {
+                        //
                         c = findBootstrapClassOrNull(name);
                     }
                 } catch (ClassNotFoundException e) {
@@ -429,6 +433,8 @@ public abstract class ClassLoader {
                     sun.misc.PerfCounter.getFindClasses().increment();
                 }
             }
+            //第一次进来 加载，加载了缓存
+            //被迭代进去的最里面的父类先执行这里
             if (resolve) {
                 resolveClass(c);
             }

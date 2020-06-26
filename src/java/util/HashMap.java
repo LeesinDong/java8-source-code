@@ -431,7 +431,9 @@ public class HashMap<K, V> extends AbstractMap<K, V>
         Node<K, V> p;
         int n, i;
         //如果哈希表为空，调用resize()创建一个哈希表，并用变量n记录哈希表长度
+        //当前node节点的数组为空？
         if ((tab = table) == null || (n = tab.length) == 0)
+            //为空，初始化node数组
             n = (tab = resize()).length;
         /**
          * 如果指定参数hash在表中没有对应的桶，即为没有碰撞
@@ -441,10 +443,10 @@ public class HashMap<K, V> extends AbstractMap<K, V>
         if ((p = tab[i = (n - 1) & hash]) == null)
             //直接将键值对插入到map中即可
             tab[i] = newNode(hash, key, value, null);
-        else {// 桶中已经存在元素
+        else {// 数组中已经存在元素
             Node<K, V> e;
             K k;
-            // 比较桶中第一个元素(数组中的结点)的hash值相等，key相等
+            // 比较桶中第一个元素(数组中的结点)的hash值相等(即下标相等)，key相等
             if (p.hash == hash &&
                     ((k = p.key) == key || (key != null && key.equals(k))))
                 // 将第一个元素赋值给e，用e来记录
@@ -452,7 +454,7 @@ public class HashMap<K, V> extends AbstractMap<K, V>
                 // 当前桶中无该键值对，且桶是红黑树结构，按照红黑树结构插入
             else if (p instanceof TreeNode)
                 e = ((TreeNode<K, V>) p).putTreeVal(this, tab, hash, key, value);
-                // 当前桶中无该键值对，且桶是链表结构，按照链表结构插入到尾部
+                // 数组中有了相同key，当前桶中无该键值对，且桶是链表结构，按照链表结构插入到尾部
             else {
                 for (int binCount = 0; ; ++binCount) {
                     // 遍历到链表尾部
@@ -518,16 +520,18 @@ public class HashMap<K, V> extends AbstractMap<K, V>
         int newCap, newThr = 0;
         //如果扩容前的容量 > 0
         if (oldCap > 0) {
-            //如果原来的数组长度大于最大值(2^30)
+            //如果原来的数组长度大于最大值(2^30) MAXIMUM_CAPACITY = 30
             if (oldCap >= MAXIMUM_CAPACITY) {
                 //扩容临界值提高到正无穷
                 threshold = Integer.MAX_VALUE;
                 //无法进行扩容，返回原来的数组
                 return oldTab;
                 //如果现在容量的两倍小于MAXIMUM_CAPACITY且现在的容量大于DEFAULT_INITIAL_CAPACITY
+                //数组大小左移1位，左移变成2^5 = 32 即16*2
             } else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
                     oldCap >= DEFAULT_INITIAL_CAPACITY)
                 //临界值变为原来的2倍
+                //临界值 左移 1位，12变成24
                 newThr = oldThr << 1;
         } else if (oldThr > 0) //如果旧容量 <= 0，而且旧临界值 > 0
             //数组的新容量设置为老数组扩容的临界值
@@ -554,28 +558,36 @@ public class HashMap<K, V> extends AbstractMap<K, V>
         //如果旧table不为空，将旧table中的元素复制到新的table中
         if (oldTab != null) {
             //遍历旧哈希表的每个桶，将旧哈希表中的桶复制到新的哈希表中
+            //遍历老数组
             for (int j = 0; j < oldCap; ++j) {
                 Node<K, V> e;
                 //如果旧桶不为null，使用e记录旧桶
+                //不为null才有必要移动
                 if ((e = oldTab[j]) != null) {
                     //将旧桶置为null
                     oldTab[j] = null;
                     //如果旧桶中只有一个node
                     if (e.next == null)
                         //将e也就是oldTab[j]放入newTab中e.hash & (newCap - 1)的位置
+                        // e.hash 未改变 & 改变后的数组大小-1 重新计算下标值
                         newTab[e.hash & (newCap - 1)] = e;
                         //如果旧桶中的结构为红黑树
                     else if (e instanceof TreeNode)
                         //将树中的node分离
                         ((TreeNode<K, V>) e).split(this, newTab, j, oldCap);
                     else {  //如果旧桶中的结构为链表,链表重排，jdk1.8做的一系列优化
+                        //弄成两个新的链表了
+                        //lo新的位置的链表
                         Node<K, V> loHead = null, loTail = null;
+                        //hi原来位置的链表
                         Node<K, V> hiHead = null, hiTail = null;
                         Node<K, V> next;
-                        //遍历整个链表中的节点
+                        //遍历整个链表中的节点，直接分到两个了链表中
                         do {
                             next = e.next;
                             // 原索引
+                            //=0说明倒数第5位为0，新的011111 和 01111一个结果，还在原来的位置
+                            //=0放入lo链表
                             if ((e.hash & oldCap) == 0) {
                                 if (loTail == null)
                                     loHead = e;
@@ -590,14 +602,18 @@ public class HashMap<K, V> extends AbstractMap<K, V>
                                 hiTail = e;
                             }
                         } while ((e = next) != null);
+
+                        //直接将两个链表，放到新的数组
                         // 原索引放到bucket里
                         if (loTail != null) {
                             loTail.next = null;
+                            //把整个lo放到新链表的j位置
                             newTab[j] = loHead;
                         }
                         // 原索引+oldCap放到bucket里
                         if (hiTail != null) {
                             hiTail.next = null;
+                            //把整个hi链表放到新链表j+old大小位置
                             newTab[j + oldCap] = hiHead;
                         }
                     }
