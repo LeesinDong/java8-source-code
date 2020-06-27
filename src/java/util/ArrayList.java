@@ -59,6 +59,7 @@ public class ArrayList<E> extends AbstractList<E>
     /**
      * 存放数据的数组的缓存变量，不可序列化
      */
+    //就是ArrayList的数据结构，就是数组
     transient Object[] elementData;
 
     /**
@@ -104,10 +105,12 @@ public class ArrayList<E> extends AbstractList<E>
      * @throws NullPointerException 如果指定的集合是空的
      */
     public ArrayList(Collection<? extends E> c) {
+        //Cllection转化成数组
         elementData = c.toArray();
         if ((size = elementData.length) != 0) {
             // c.toarray可能（错误地）不返回对象[]（见JAVA BUG编号6260652）
             if (elementData.getClass() != Object[].class)
+                //Array.copyOf拷贝到数组中
                 elementData = Arrays.copyOf(elementData, size, Object[].class);
         } else {
             // 使用空数组
@@ -150,7 +153,9 @@ public class ArrayList<E> extends AbstractList<E>
     }
 
     private static int calculateCapacity(Object[] elementData, int minCapacity) {
+        //空参  赋值为空空数组
         if (elementData == DEFAULTCAPACITY_EMPTY_ELEMENTDATA) {
+            // 0 10 取大的，初始数组大小10
             return Math.max(DEFAULT_CAPACITY, minCapacity);
         }
         return minCapacity;
@@ -162,6 +167,7 @@ public class ArrayList<E> extends AbstractList<E>
      * @param minCapacity
      */
     private void ensureCapacityInternal(int minCapacity) {
+        //                        空数组 ： 返回数组大小 0 10？ 不是空数组：直接返回数组大小
         ensureExplicitCapacity(calculateCapacity(elementData, minCapacity));
     }
 
@@ -174,6 +180,7 @@ public class ArrayList<E> extends AbstractList<E>
         modCount++;
 
         // 如果最小需要空间比elementData的内存空间要大，则需要扩容
+        //minCapacity = size+1 > 数组大小
         if (minCapacity - elementData.length > 0)
             grow(minCapacity);
     }
@@ -190,8 +197,10 @@ public class ArrayList<E> extends AbstractList<E>
      */
     private void grow(int minCapacity) {
         // 获取到ArrayList中elementData数组的内存空间长度
+        //初始化大小10
         int oldCapacity = elementData.length;
         // 扩容至原来的1.5倍
+        //10+5
         int newCapacity = oldCapacity + (oldCapacity >> 1);
         // 再判断一下新数组的容量够不够，够了就直接使用这个长度创建新数组，
         // 不够就将数组长度设置为需要的长度
@@ -202,6 +211,7 @@ public class ArrayList<E> extends AbstractList<E>
             newCapacity = hugeCapacity(minCapacity);
         // 调用Arrays.copyOf方法将elementData数组指向新的内存空间时newCapacity的连续空间
         // 并将elementData的数据复制到新的内存空间
+        //拷贝到新的数组
         elementData = Arrays.copyOf(elementData, newCapacity);
     }
 
@@ -726,6 +736,7 @@ public class ArrayList<E> extends AbstractList<E>
             Object[] a = elementData;
             //读入所有元素
             for (int i = 0; i < size; i++) {
+                //s 读入数组长度
                 a[i] = s.readObject();
             }
         }

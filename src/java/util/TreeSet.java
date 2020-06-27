@@ -95,6 +95,7 @@ public class TreeSet<E> extends AbstractSet<E>
     /**
      * The backing map.
      */
+    //                  接口
     private transient NavigableMap<E,Object> m;
 
     // Dummy value to associate with an Object in the backing Map
@@ -298,7 +299,9 @@ public class TreeSet<E> extends AbstractSet<E>
     public  boolean addAll(Collection<? extends E> c) {
         // Use linear-time version if applicable
         if (m.size()==0 && c.size() > 0 &&
+                //
             c instanceof SortedSet &&
+                //
             m instanceof TreeMap) {
             SortedSet<? extends E> set = (SortedSet<? extends E>) c;
             TreeMap<E,Object> map = (TreeMap<E, Object>) m;

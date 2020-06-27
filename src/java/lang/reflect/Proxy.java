@@ -706,7 +706,7 @@ public class Proxy implements java.io.Serializable {
         throws IllegalArgumentException
     {
         Objects.requireNonNull(h);
-
+        //clone方法复制了类，
         final Class<?>[] intfs = interfaces.clone();
         final SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
@@ -716,6 +716,7 @@ public class Proxy implements java.io.Serializable {
         /*
          * Look up or generate the designated proxy class.
          */
+        //动态代理类
         Class<?> cl = getProxyClass0(loader, intfs);
 
         /*
@@ -725,7 +726,7 @@ public class Proxy implements java.io.Serializable {
             if (sm != null) {
                 checkNewProxyPermission(Reflection.getCallerClass(), cl);
             }
-
+            //cl.getConstructor获得类的构造函数
             final Constructor<?> cons = cl.getConstructor(constructorParams);
             final InvocationHandler ih = h;
             if (!Modifier.isPublic(cl.getModifiers())) {
@@ -736,6 +737,7 @@ public class Proxy implements java.io.Serializable {
                     }
                 });
             }
+            //构建一个实例 构造方法的newInstance
             return cons.newInstance(new Object[]{h});
         } catch (IllegalAccessException|InstantiationException e) {
             throw new InternalError(e.toString(), e);
