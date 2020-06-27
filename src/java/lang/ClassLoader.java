@@ -401,38 +401,44 @@ public abstract class ClassLoader {
     protected Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException
     {
+        //获得一把锁，进行同步
         synchronized (getClassLoadingLock(name)) {
             // First, check if the class has already been loaded
+            //判断类是否已经被加载了，加载过就不需要加载了
             Class<?> c = findLoadedClass(name);
             //没有缓存，即没有加载
             if (c == null) {
                 long t0 = System.nanoTime();
                 try {
+                    //父加载器是不是为空
                     if (parent != null) {
+                        //不为空，让父加载器加载
                         //父类迭代
                         //一层一层找父类
                         c = parent.loadClass(name, false);
                     } else {
-                        //
+                        //extension classloader 的 parent = null,因为bootstrap 是c++实现，java里获取这个对象返回null
+                        //是extension classloader就让Bootstrap去加载
                         c = findBootstrapClassOrNull(name);
                     }
                 } catch (ClassNotFoundException e) {
                     // ClassNotFoundException thrown if class not found
                     // from the non-null parent class loader
                 }
-
+                //父加载器器不能加载，当前加载器加载
                 if (c == null) {
                     // If still not found, then invoke findClass in order
                     // to find the class.
                     long t1 = System.nanoTime();
+                    //加载
                     c = findClass(name);
-
                     // this is the defining class loader; record the stats
                     sun.misc.PerfCounter.getParentDelegationTime().addTime(t1 - t0);
                     sun.misc.PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
                     sun.misc.PerfCounter.getFindClasses().increment();
                 }
             }
+            //下面胡说八道的
             //第一次进来 加载，加载了缓存
             //被迭代进去的最里面的父类先执行这里
             if (resolve) {
