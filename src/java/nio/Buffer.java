@@ -354,7 +354,9 @@ public abstract class Buffer {
      * @return  This buffer
      */
     public final Buffer flip() {
+        //position记录 最后读取  的位置   初始值是0
         limit = position;
+        //position归零，因为可能还要读取其他的数据
         position = 0;
         mark = -1;
         return this;

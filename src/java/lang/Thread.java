@@ -895,6 +895,7 @@ public class Thread implements Runnable {
      * @revised 6.0
      */
     public boolean isInterrupted() {
+        //clearInterrupted 是false
         return isInterrupted(false);
     }
 
@@ -1112,18 +1113,21 @@ public class Thread implements Runnable {
      *                                  <i>interrupted status</i> of the current thread is
      *                                  cleared when this exception is thrown.
      */
+    //获得synchronized，意味着当前方法是线程安全的
     public final synchronized void join(long millis) throws InterruptedException {
         long base = System.currentTimeMillis();
         long now = 0;
-
+        //millis是不是超时的join
         if (millis < 0) {
             throw new IllegalArgumentException("timeout value is negative");
         }
 
         if (millis == 0) {
+            //没有在超时时间
             // 其他线程好了之后，当前线程的状态是 TERMINATED,isAlive 返回 false
             // NEW false
             // RUNNABLE true
+            //siAlive（）线程是不是存活状态，如果是的 ，持续调用wait
             while (isAlive()) {
                 // 等待其他线程,一直等待
                 wait(0);

@@ -219,7 +219,9 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         // 2. CAS 成功，就表示成功获得了锁
         // 3. CAS 失败，调用 acquire(1)走锁竞争逻辑
         final void lock() {
+            //设置锁的状态
             if (compareAndSetState(0, 1))
+                //当前线程设置成独占状态
                 setExclusiveOwnerThread(Thread.currentThread());
             else
                 acquire(1);
